@@ -7,39 +7,27 @@ env:
     AWS_REGION: "us-east-2"
   exported-variables:
     - IMAGE_TAG
+    - IMAGE_URI
 
 phases:
-  install:
-    commands:
-      - echo "Installing Node dependencies..."
-      - npm install
-
   pre_build:
     commands:
-      - echo "Setting image tag..."
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:-latest}
-      - echo "Logging into ECR..."
       - aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
-
+      
   build:
     commands:
-      - echo "Building React app..."
-      - npm run build
-      - echo "Building Docker image..."
       - docker build -t $IMAGE_NAME .
       - docker tag $IMAGE_NAME:latest $ECR_REPO_URI:$IMAGE_TAG
       - docker tag $IMAGE_NAME:latest $ECR_REPO_URI:latest
 
   post_build:
     commands:
-      - echo "Pushing image to ECR..."
       - docker push $ECR_REPO_URI:$IMAGE_TAG
       - docker push $ECR_REPO_URI:latest
-      - echo "Writing imagedefinitions.json..."
       - printf '[{"name":"%s","imageUri":"%s"}]' "$IMAGE_NAME" "$ECR_REPO_URI:$IMAGE_TAG" > imagedefinitions.json
 
 artifacts:
   files:
-    - appspec.yaml
     - imagedefinitions.json
